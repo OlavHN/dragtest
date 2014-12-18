@@ -5,21 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="http://facebook.github.io/rebound-js/rebound.js"></script>
   </head>
-  <body>
-    <div id="draggable">Heeey!</div>
+  <body style="overflow: hidden;">
+    <div id="draggable" style="will-change: transform;">Heeey!</div>
     <script>
       var draggableDiv = document.getElementById('draggable');
       var springSystem = new rebound.SpringSystem();
       var xSpring = springSystem.createSpring(50, 3);
       var ySpring = springSystem.createSpring(50, 3);
       var offset, position, time, velocity, dragging;
+      var moveState = {
+        input: {
+          x: 0,
+          y: 0
+        },
+        position: {
+          x: 0,
+          y: 0
+        },
+        newPos: {
+          x: 0,
+          y: 0
+        },
+        dPos: {
+          x: 0,
+          y: 0
+        },
+        offset: {
+          x: 0,
+          y: 0
+        },
+        velocity: {
+          x: 0,
+          y: 0
+        },
+        time: 0,
+        newTime: 0
+      };
 
       xSpring.addListener({
         onSpringUpdate: function(spring) {
           if (dragging)
             return;
-          position.x = spring.getCurrentValue();
-          draggable.style.transform = 'translate3d(' + position.x + 'px, ' + position.y + 'px, 0)'
+          moveState.position.x = spring.getCurrentValue();
+          draggable.style.transform = 'translate3d(' + moveState.position.x + 'px, ' + moveState.position.y + 'px, 0)'
         }
       });
 
@@ -27,21 +55,19 @@
         onSpringUpdate: function(spring) {
           if (dragging)
             return;
-          position.y = spring.getCurrentValue();
-          draggable.style.transform = 'translate3d(' + position.x + 'px, ' + position.y + 'px, 0)'
+          moveState.position.y = spring.getCurrentValue();
+          draggable.style.transform = 'translate3d(' + moveState.position.x + 'px, ' + moveState.position.y + 'px, 0)'
         }
       });
 
-      function getInput(evt) {
+      function setInput(evt) {
         if ('ontouchstart' in window) {
-          return {
-            x: evt.changedTouches[0].clientX,
-            y: evt.changedTouches[0].clientY
-          };
+          moveState.input.x = evt.changedTouches[0].clientX;
+          moveState.input.y = evt.changedTouches[0].clientY;
+        } else {
+          moveState.input.x = evt.clientX;
+          moveState.input.y = evt.clientY;
         }
-        return {
-          x: evt.clientX, y: evt.clientY
-        };
       }
 
       function start(evt) {
@@ -49,24 +75,18 @@
 
         dragging = true;
 
-        var input = getInput(evt);
-        
-        time = Date.now();
+        setInput(evt);
 
-        offset = {
-          x: input.x - this.getBoundingClientRect().left,
-          y: input.y - this.getBoundingClientRect().top
-        }
+        moveState.time = Date.now();
 
-        position = {
-          x: input.x - offset.x,
-          y: input.y - offset.y
-        };
+        moveState.offset.x = moveState.input.x - this.getBoundingClientRect().left;
+        moveState.offset.y = moveState.input.y - this.getBoundingClientRect().top;
 
-        velocity = {
-          x: 0,
-          y: 0
-        };
+        moveState.position.x = moveState.input.x - moveState.offset.x;
+        moveState.position.y = moveState.input.y - moveState.offset.y;
+
+        moveState.velocity.x = 0;
+        moveState.velocity.y = 0;
 
         document.addEventListener('mousemove', move);
         document.addEventListener('mouseup', end);
@@ -75,49 +95,41 @@
       }
 
       function move(evt) {
-        var input = getInput(evt);
+        setInput(evt);
 
-        var newPos = {
-          x: input.x - offset.x,
-          y: input.y - offset.y
-        };
+        moveState.newPos.x = moveState.input.x - moveState.offset.x;
+        moveState.newPos.y = moveState.input.y - moveState.offset.y;
 
-        var dPos = {
-          x: newPos.x - position.x,
-          y: newPos.y - position.y
-        };
+        moveState.dPos.x = moveState.newPos.x - moveState.position.x;
+        moveState.dPos.y = moveState.newPos.y - moveState.position.y;
 
-        var newTime = Date.now();
+        moveState.newTime = Date.now();
 
-        velocity = {
-          x: 1000 * dPos.x / (newTime - time),
-          y: 1000 * dPos.y / (newTime - time)
-        };
+        moveState.velocity.x = 1000 * moveState.dPos.x / (moveState.newTime - moveState.time);
+        moveState.velocity.y = 1000 * moveState.dPos.y / (moveState.newTime - moveState.time);
 
-        time = newTime;
+        moveState.time = moveState.newTime;
 
-        position = {
-          x: newPos.x,
-          y: newPos.y
-        };
+        moveState.position.x = moveState.newPos.x;
+        moveState.position.y = moveState.newPos.y;
 
-        draggable.style.transform = 'translate3d(' + position.x + 'px, ' + position.y + 'px, 0)'
+        draggable.style.transform = 'translate3d(' + moveState.position.x + 'px, ' + moveState.position.y + 'px, 0)'
       }
 
       function end(evt) {
         dragging = false;
 
         xSpring
-          .setCurrentValue(position.x)
-          .setVelocity(velocity.x) 
-          .setEndValue(Math.max(0, Math.min(window.innerWidth, position.x + velocity.x * 0.5)));
+          .setCurrentValue(moveState.position.x)
+          .setVelocity(moveState.velocity.x)
+          .setEndValue(Math.max(0, Math.min(window.innerWidth, moveState.position.x + moveState.velocity.x * 0.5)));
 
         ySpring
-          .setCurrentValue(position.y)
-          .setVelocity(velocity.y) 
-          .setEndValue(Math.max(0, Math.min(window.innerWidth, position.y + velocity.y * 0.5)));
+          .setCurrentValue(moveState.position.y)
+          .setVelocity(moveState.velocity.y)
+          .setEndValue(Math.max(0, Math.min(window.innerWidth, moveState.position.y + moveState.velocity.y * 0.5)));
 
-        draggable.style.transform = 'translate3d(' + position.x + 'px, ' + position.y + 'px, 0)'
+        draggable.style.transform = 'translate3d(' + moveState.position.x + 'px, ' + moveState.position.y + 'px, 0)'
 
         document.removeEventListener('mousemove', move);
         document.removeEventListener('mouseup', end);
